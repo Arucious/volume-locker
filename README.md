@@ -63,6 +63,21 @@ Volume Locker can automatically switch your default audio device based on a prio
 5.  Check **Notify on restore** to get a notification when the default device is switched.
 6.  Check **Also switch default communication device** to also switch the default communication device.
 
+### Communication Device Priority
+
+Windows tracks two separate default output/input devices: one for multimedia and games, and one for communication apps (Discord, Teams, Zoom, and anything else set to "Default" for voice). By default Volume Locker points both at the same device, but you can give the communication role its own priority list — for example, game audio on your speakers while voice chat stays on your headset.
+
+1.  Navigate to **Default output device priority** or **Default input device priority**.
+2.  Open the **Communication device priority** submenu.
+3.  Select **Add device** and order the list exactly like the main priority list.
+
+While this list has at least one device in it, it takes over the communication role completely and **Also switch default communication device** is greyed out. Leave the list empty to keep the original behavior, where the communication device simply follows the main priority list.
+
+Notes:
+
+- The two lists are independent — a device can appear in both, and the communication list has its own **Add device** / **Move up** / **Remove device** controls.
+- **Temporary default device priority** only overrides the main list. When a communication priority list is configured, temporarily switching devices will not move your voice chat.
+
 ### Temporary Default Device Priority
 
 If you want to temporarily use a different device without changing your priority list (e.g., switching to speakers for a call while the headphones are connected), you can use the **Temporary default device priority** feature.

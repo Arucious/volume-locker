@@ -1,6 +1,6 @@
 use crate::config::PersistentState;
 use crate::notification::NotificationThrottler;
-use crate::types::{DeviceId, DeviceRole, DeviceType, TemporaryPriorities};
+use crate::types::{DeviceId, DeviceRole, DeviceType, PriorityKind, TemporaryPriorities};
 
 use super::AudioBackend;
 
@@ -48,56 +48,107 @@ fn enforce_priority_for_type(
         priority_list.insert(0, temp_id.clone());
     }
 
-    let Some(target_id) = find_highest_priority_active_device(backend, &priority_list) else {
-        return;
-    };
+    let main_target = find_highest_priority_active_device(backend, &priority_list);
+    let comm_target =
+        resolve_communication_target(backend, device_type, state, main_target.as_ref());
 
-    let mut switched = false;
+    // Devices that were actually switched to, paired with the list that chose them.
+    let mut switched: Vec<(DeviceId, PriorityKind)> = Vec::new();
 
     // Enforce Console and Multimedia roles together
-    if !is_default_device(backend, device_type, DeviceRole::Console, &target_id) {
+    if let Some(target_id) = &main_target
+        && !is_default_device(backend, device_type, DeviceRole::Console, target_id)
+    {
         log::info!("Enforcing {device_type} priority: Switching to {target_id}");
         for role in [DeviceRole::Console, DeviceRole::Multimedia] {
-            if let Err(e) = backend.set_default_device(&target_id, role) {
+            if let Err(e) = backend.set_default_device(target_id, role) {
                 log::error!(
                     "Failed to set default {role} {device_type} device to {target_id}: {e:#}"
                 );
             }
         }
-        switched = true;
+        switched.push((target_id.clone(), PriorityKind::Main));
     }
 
-    // Enforce Communications role if enabled
-    if state.switch_communication_device(device_type)
-        && !is_default_device(backend, device_type, DeviceRole::Communications, &target_id)
+    if let Some(target_id) = &comm_target
+        && !is_default_device(backend, device_type, DeviceRole::Communications, target_id)
     {
         log::info!("Enforcing {device_type} priority (Communication): Switching to {target_id}");
-        if let Err(e) = backend.set_default_device(&target_id, DeviceRole::Communications) {
+        if let Err(e) = backend.set_default_device(target_id, DeviceRole::Communications) {
             log::error!(
                 "Failed to set default {device_type} communications device to {target_id}: {e:#}"
             );
         }
-        switched = true;
+        // Only report the communication switch separately when it landed on a
+        // different device than the main roles did.
+        if !switched.iter().any(|(id, _)| id == target_id) {
+            switched.push((target_id.clone(), PriorityKind::Communication));
+        }
     }
 
-    if switched && state.notify_on_priority_restore(device_type) {
-        let device_name = backend.device_by_id(&target_id).map_or_else(
-            |e| {
-                log::warn!("Could not get name for device {target_id}: {e:#}");
-                "Unknown Device".to_string()
-            },
-            |d| d.name(),
-        );
-        let title = match device_type {
-            DeviceType::Output => "Default Output Device Restored",
-            DeviceType::Input => "Default Input Device Restored",
-        };
-        throttler.send_if_not_throttled(
-            &format!("priority_restore_{target_id}"),
-            title,
-            &format!("Switched to {device_name} based on priority list."),
-        );
+    if state.notify_on_priority_restore(device_type) {
+        for (target_id, kind) in switched {
+            notify_priority_restored(backend, device_type, kind, &target_id, throttler);
+        }
     }
+}
+
+/// Determines which device the Communications role should resolve to.
+///
+/// A non-empty communication priority list takes over the role entirely. When
+/// the list is empty the role mirrors the main list, gated on the
+/// "Also switch default communication device" preference — the pre-existing
+/// behavior.
+fn resolve_communication_target(
+    backend: &impl AudioBackend,
+    device_type: DeviceType,
+    state: &PersistentState,
+    main_target: Option<&DeviceId>,
+) -> Option<DeviceId> {
+    let comm_list = state.communication_priority_list(device_type);
+    if comm_list.is_empty() {
+        return if state.switch_communication_device(device_type) {
+            main_target.cloned()
+        } else {
+            None
+        };
+    }
+    find_highest_priority_active_device(backend, comm_list)
+}
+
+fn notify_priority_restored(
+    backend: &impl AudioBackend,
+    device_type: DeviceType,
+    kind: PriorityKind,
+    target_id: &DeviceId,
+    throttler: &mut NotificationThrottler,
+) {
+    let device_name = backend.device_by_id(target_id).map_or_else(
+        |e| {
+            log::warn!("Could not get name for device {target_id}: {e:#}");
+            "Unknown Device".to_string()
+        },
+        |d| d.name(),
+    );
+    let title = match (device_type, kind) {
+        (DeviceType::Output, PriorityKind::Main) => "Default Output Device Restored",
+        (DeviceType::Input, PriorityKind::Main) => "Default Input Device Restored",
+        (DeviceType::Output, PriorityKind::Communication) => {
+            "Default Output Communication Device Restored"
+        }
+        (DeviceType::Input, PriorityKind::Communication) => {
+            "Default Input Communication Device Restored"
+        }
+    };
+    let throttle_key = match kind {
+        PriorityKind::Main => format!("priority_restore_{target_id}"),
+        PriorityKind::Communication => format!("priority_restore_communication_{target_id}"),
+    };
+    throttler.send_if_not_throttled(
+        &throttle_key,
+        title,
+        &format!("Switched to {device_name} based on priority list."),
+    );
 }
 
 fn find_highest_priority_active_device(
@@ -272,6 +323,196 @@ mod tests {
                 .borrow()
                 .get(&DeviceType::Output),
             Some(&"dev_a".to_string())
+        );
+    }
+
+    #[test]
+    fn communication_list_routes_roles_independently() {
+        let backend = MockAudioBackend::new(vec![
+            MockDevice::new("speakers", "Speakers", true),
+            MockDevice::new("headset", "Headset", true),
+        ]);
+        backend.set_default("headset", DeviceType::Output);
+
+        let mut state = PersistentState::default();
+        state.output.priority_list = vec!["speakers".into()];
+        state.output.communication_priority_list = vec!["headset".into()];
+
+        let mut times = NotificationThrottler::new();
+        let temp = TemporaryPriorities {
+            output: None,
+            input: None,
+        };
+
+        enforce_priorities(&backend, &state, &mut times, &temp);
+
+        assert_eq!(
+            backend.default_console.borrow().get(&DeviceType::Output),
+            Some(&"speakers".to_string())
+        );
+        assert_eq!(
+            backend
+                .default_communications
+                .borrow()
+                .get(&DeviceType::Output),
+            Some(&"headset".to_string())
+        );
+    }
+
+    #[test]
+    fn communication_list_overrides_switch_communication_preference() {
+        let backend = MockAudioBackend::new(vec![
+            MockDevice::new("speakers", "Speakers", true),
+            MockDevice::new("headset", "Headset", true),
+        ]);
+        backend.set_default("speakers", DeviceType::Output);
+
+        let mut state = PersistentState::default();
+        state.output.priority_list = vec!["speakers".into()];
+        state.output.communication_priority_list = vec!["headset".into()];
+        // Even with mirroring switched off, a configured list still drives the role.
+        state.output.switch_communication_device = false;
+
+        let mut times = NotificationThrottler::new();
+        let temp = TemporaryPriorities {
+            output: None,
+            input: None,
+        };
+
+        enforce_priorities(&backend, &state, &mut times, &temp);
+
+        assert_eq!(
+            backend
+                .default_communications
+                .borrow()
+                .get(&DeviceType::Output),
+            Some(&"headset".to_string())
+        );
+    }
+
+    #[test]
+    fn communication_list_skips_inactive_devices() {
+        let backend = MockAudioBackend::new(vec![
+            MockDevice::new("speakers", "Speakers", true),
+            MockDevice::new("headset", "Headset", false),
+            MockDevice::new("earbuds", "Earbuds", true),
+        ]);
+        backend.set_default("speakers", DeviceType::Output);
+
+        let mut state = PersistentState::default();
+        state.output.priority_list = vec!["speakers".into()];
+        state.output.communication_priority_list = vec!["headset".into(), "earbuds".into()];
+
+        let mut times = NotificationThrottler::new();
+        let temp = TemporaryPriorities {
+            output: None,
+            input: None,
+        };
+
+        enforce_priorities(&backend, &state, &mut times, &temp);
+
+        assert_eq!(
+            backend
+                .default_communications
+                .borrow()
+                .get(&DeviceType::Output),
+            Some(&"earbuds".to_string())
+        );
+    }
+
+    #[test]
+    fn communication_list_applies_without_a_main_list() {
+        let backend = MockAudioBackend::new(vec![
+            MockDevice::new("speakers", "Speakers", true),
+            MockDevice::new("headset", "Headset", true),
+        ]);
+        backend.set_default("speakers", DeviceType::Output);
+
+        let mut state = PersistentState::default();
+        state.output.communication_priority_list = vec!["headset".into()];
+
+        let mut times = NotificationThrottler::new();
+        let temp = TemporaryPriorities {
+            output: None,
+            input: None,
+        };
+
+        enforce_priorities(&backend, &state, &mut times, &temp);
+
+        // Console/Multimedia are left alone, only Communications moves.
+        assert_eq!(
+            backend.default_console.borrow().get(&DeviceType::Output),
+            Some(&"speakers".to_string())
+        );
+        assert_eq!(
+            backend
+                .default_communications
+                .borrow()
+                .get(&DeviceType::Output),
+            Some(&"headset".to_string())
+        );
+    }
+
+    #[test]
+    fn empty_communication_list_preserves_mirroring() {
+        let backend = MockAudioBackend::new(vec![
+            MockDevice::new("dev_a", "Device A", true),
+            MockDevice::new("dev_b", "Device B", true),
+        ]);
+        backend.set_default("dev_b", DeviceType::Output);
+
+        let mut state = PersistentState::default();
+        state.output.priority_list = vec!["dev_a".into()];
+        state.output.switch_communication_device = true;
+
+        let mut times = NotificationThrottler::new();
+        let temp = TemporaryPriorities {
+            output: None,
+            input: None,
+        };
+
+        enforce_priorities(&backend, &state, &mut times, &temp);
+
+        assert_eq!(
+            backend
+                .default_communications
+                .borrow()
+                .get(&DeviceType::Output),
+            Some(&"dev_a".to_string())
+        );
+    }
+
+    #[test]
+    fn temporary_priority_does_not_hijack_communication_list() {
+        let backend = MockAudioBackend::new(vec![
+            MockDevice::new("speakers", "Speakers", true),
+            MockDevice::new("headset", "Headset", true),
+            MockDevice::new("dev_temp", "Temp Device", true),
+        ]);
+        backend.set_default("speakers", DeviceType::Output);
+
+        let mut state = PersistentState::default();
+        state.output.priority_list = vec!["speakers".into()];
+        state.output.communication_priority_list = vec!["headset".into()];
+
+        let mut times = NotificationThrottler::new();
+        let temp = TemporaryPriorities {
+            output: Some("dev_temp".into()),
+            input: None,
+        };
+
+        enforce_priorities(&backend, &state, &mut times, &temp);
+
+        assert_eq!(
+            backend.default_console.borrow().get(&DeviceType::Output),
+            Some(&"dev_temp".to_string())
+        );
+        assert_eq!(
+            backend
+                .default_communications
+                .borrow()
+                .get(&DeviceType::Output),
+            Some(&"headset".to_string())
         );
     }
 
