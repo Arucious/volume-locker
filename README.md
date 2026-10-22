@@ -16,7 +16,7 @@ Never worry about your microphone volume or default device again!
 
 This fork of [felipecrs/volume-locker](https://github.com/felipecrs/volume-locker) adds independent communication-device priority lists for both output and input. Keep game or media audio on your speakers while voice chat uses your headset, with separate automatic fallback orders for each role.
 
-Configure the lists in the **Communication device priority** submenu under the output or input priority section. Empty communication lists preserve upstream behavior, and temporary default-device overrides leave configured communication priorities in place. See [Communication Device Priority](#communication-device-priority) for details.
+Configure an output's paired destination in **Output devices > device > Voice output**, or keep independent global priorities under **Communication settings > Communication device priority** in the output/input priority section. See [Paired Voice Outputs](#paired-voice-outputs) and [Communication Device Priority](#communication-device-priority) for details.
 
 Download this fork's Windows executable from the [releases page](https://github.com/Arucious/volume-locker/releases/latest), or build with `cargo build --release --locked` and run `target/release/VolumeLocker.exe`. The installation commands and in-app updater use this fork's releases.
 
@@ -41,6 +41,8 @@ New-Item -ItemType Directory -Path 'C:\Apps\Volume Locker' -Force >$null; `
 You can also use the snippet above to update the app, just run it again.
 
 ## Usage
+
+This branch explores [paired voice outputs and headset power detection](docs/paired-outputs-and-headset-presence.md). Build this branch from source to try these prototypes; the published v0.9.0 release does not include them. Pair a voice destination inside an existing output-device submenu; the experimental A50 X detector is opt-in under that device's **Availability** submenu. See the exploration notes for startup and firmware limitations.
 
 Click on the Volume Locker tray icon to access the menu. The menu is organized into the following sections:
 
@@ -69,22 +71,30 @@ Volume Locker can automatically switch your default audio device based on a prio
 3.  Use **Move Up** and **Move Down** to adjust the priority order. The device at the top has the highest priority.
 4.  Volume Locker will monitor your devices and automatically switch the default device to the highest priority one available.
 5.  Check **Notify on restore** to get a notification when the default device is switched.
-6.  Check **Also switch default communication device** to also switch the default communication device.
+6.  Open **Communication settings** and check **Also switch default communication device** to also switch the default communication device.
+
+### Paired Voice Outputs
+
+For a split-channel headset, open **Output devices > A50 X Game > Voice output** and select **A50 X Voice**. For speakers, choose **Voice output > Same as this output**. The existing priority list and temporary output selection now switch the corresponding voice destination too, without needing another list. If the paired output is unavailable, voice falls back to the selected main output until the pair returns.
+
+**Use global voice settings** preserves the original global communication behavior for that output. Explicit per-output choices take precedence over the global communication list and checkbox.
+
+With an empty main output priority list, paired voice outputs also follow switches made in Windows. With a priority list configured, use **Temporary default device priority** to override that order.
 
 ### Communication Device Priority
 
 Windows tracks two separate default output/input devices: one for multimedia and games, and one for communication apps (Discord, Teams, Zoom, and anything else set to "Default" for voice). By default Volume Locker points both at the same device, but you can give the communication role its own priority list — for example, game audio on your speakers while voice chat stays on your headset.
 
 1.  Navigate to **Default output device priority** or **Default input device priority**.
-2.  Open the **Communication device priority** submenu.
+2.  Open **Communication settings > Communication device priority**.
 3.  Select **Add device** and order the list exactly like the main priority list.
 
-While this list has at least one device in it, it takes over the communication role completely and **Also switch default communication device** is greyed out. Leave the list empty to keep the original behavior, where the communication device simply follows the main priority list.
+For outputs using **Use global voice settings**, a non-empty communication list controls the communication role and **Also switch default communication device** is greyed out. Leave the list empty to keep the original behavior, where the communication device follows the main priority list when the checkbox is enabled. Per-output voice routes take precedence over this global setting.
 
 Notes:
 
 - The two lists are independent — a device can appear in both, and the communication list has its own **Add device** / **Move up** / **Remove device** controls.
-- **Temporary default device priority** only overrides the main list. When a communication priority list is configured, temporarily switching devices will not move your voice chat.
+- **Temporary default device priority** applies the selected output's voice route. If that output uses global settings, the independent communication list keeps its existing behavior.
 
 ### Temporary Default Device Priority
 

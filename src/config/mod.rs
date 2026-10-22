@@ -2,7 +2,7 @@ mod persistence;
 
 pub use persistence::{load_state, save_state};
 
-use crate::types::DeviceSettings;
+use crate::types::{CommunicationRoute, DeviceSettings};
 use crate::types::{DeviceId, DeviceType, PriorityKind};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -204,17 +204,21 @@ impl PersistentState {
     /// Removes a device's settings entry if it has no active locks/notifications
     /// and is not referenced by any priority list.
     pub fn remove_device_if_unused(&mut self, device_id: &DeviceId) {
-        let is_prunable = self
-            .devices
-            .get(device_id)
-            .is_some_and(|s| !s.has_active_locks_or_notifications());
+        let is_prunable = self.devices.get(device_id).is_some_and(|s| {
+            !s.has_active_locks_or_notifications()
+                && s.communication_route.is_inherited()
+                && s.presence_source.is_windows()
+        });
         if !is_prunable {
             return;
         }
         let in_priority = [&self.output, &self.input].iter().any(|s| {
             s.priority_list.contains(device_id) || s.communication_priority_list.contains(device_id)
         });
-        if !in_priority {
+        let is_paired_target = self.devices.values().any(
+            |s| matches!(&s.communication_route, CommunicationRoute::Paired(id) if id == device_id),
+        );
+        if !in_priority && !is_paired_target {
             self.devices.remove(device_id);
         }
     }
@@ -260,6 +264,55 @@ mod tests {
     }
 
     #[test]
+    fn output_routing_and_presence_roundtrip_without_changing_legacy_defaults() {
+        let mut state = PersistentState::default();
+        let game =
+            state.ensure_device_settings("game".into(), "Headset Game".into(), DeviceType::Output);
+        game.communication_route = CommunicationRoute::Paired("voice".into());
+        game.presence_source = crate::types::PresenceSource::AstroA50X;
+        state.ensure_device_settings("voice".into(), "Headset Voice".into(), DeviceType::Output);
+        let json = serde_json::to_string(&state).unwrap();
+        let loaded: PersistentState = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            loaded.devices["game"].communication_route,
+            CommunicationRoute::Paired("voice".into())
+        );
+        assert_eq!(
+            loaded.devices["game"].presence_source,
+            crate::types::PresenceSource::AstroA50X
+        );
+        let legacy: DeviceSettings =
+            serde_json::from_str(r#"{"device_type":"Output","name":"Speakers"}"#).unwrap();
+        assert!(legacy.communication_route.is_inherited());
+        assert!(legacy.presence_source.is_windows());
+        let legacy_json = serde_json::to_string(&legacy).unwrap();
+        assert!(!legacy_json.contains("communication_route"));
+        assert!(!legacy_json.contains("presence_source"));
+    }
+
+    #[test]
+    fn cleanup_retains_routing_and_presence_settings_until_explicitly_cleared() {
+        let mut state = PersistentState::default();
+        state
+            .ensure_device_settings("game".into(), "Headset Game".into(), DeviceType::Output)
+            .communication_route = CommunicationRoute::Paired("voice".into());
+        state.ensure_device_settings("voice".into(), "Headset Voice".into(), DeviceType::Output);
+        state.remove_device_if_unused(&"game".into());
+        state.remove_device_if_unused(&"voice".into());
+        assert_eq!(state.device_count(), 2);
+        state.devices.get_mut("game").unwrap().communication_route = CommunicationRoute::Inherited;
+        state.devices.get_mut("game").unwrap().presence_source =
+            crate::types::PresenceSource::AstroA50X;
+        state.remove_device_if_unused(&"voice".into());
+        state.remove_device_if_unused(&"game".into());
+        assert_eq!(state.device_count(), 1);
+        state.devices.get_mut("game").unwrap().presence_source =
+            crate::types::PresenceSource::Windows;
+        state.remove_device_if_unused(&"game".into());
+        assert_eq!(state.device_count(), 0);
+    }
+
+    #[test]
     fn persistent_state_serialization_roundtrip() {
         let state = PersistentState {
             output: PerTypeSettings {
@@ -278,6 +331,8 @@ mod tests {
                     unmute_lock: UnmuteLockPolicy::default(),
                     device_type: DeviceType::Output,
                     name: "Test Device".into(),
+                    communication_route: Default::default(),
+                    presence_source: Default::default(),
                 },
             )]),
             ..Default::default()
@@ -469,6 +524,8 @@ mod tests {
                     },
                     device_type: DeviceType::Output,
                     name: "Speakers".into(),
+                    communication_route: Default::default(),
+                    presence_source: Default::default(),
                 },
             )]),
         };

@@ -1,8 +1,11 @@
 use crate::config::PersistentState;
 use crate::notification::NotificationThrottler;
-use crate::types::{DeviceId, DeviceRole, DeviceType, PriorityKind, TemporaryPriorities};
+use crate::types::{
+    CommunicationRoute, DeviceId, DeviceRole, DeviceType, PriorityKind, TemporaryPriorities,
+};
 
 use super::AudioBackend;
+use super::presence::HeadsetPresence;
 
 pub fn enforce_priorities(
     backend: &impl AudioBackend,
@@ -48,9 +51,23 @@ fn enforce_priority_for_type(
         priority_list.insert(0, temp_id.clone());
     }
 
-    let main_target = find_highest_priority_active_device(backend, &priority_list);
+    let main_target = find_highest_priority_active_device(backend, &priority_list, state);
+    // With no priority order, explicit pairs can follow a manual Windows output
+    // switch without claiming or changing the multimedia/console defaults.
+    let routing_target = main_target.clone().or_else(|| {
+        if device_type != DeviceType::Output || !priority_list.is_empty() {
+            return None;
+        }
+        let current = backend
+            .default_device(device_type, DeviceRole::Console)
+            .ok()?;
+        let settings = state.device_settings(current.id())?;
+        (!settings.communication_route.is_inherited()
+            && device_is_available(backend, current.id(), state))
+        .then(|| current.id().clone())
+    });
     let comm_target =
-        resolve_communication_target(backend, device_type, state, main_target.as_ref());
+        resolve_communication_target(backend, device_type, state, routing_target.as_ref());
 
     // Devices that were actually switched to, paired with the list that chose them.
     let mut switched: Vec<(DeviceId, PriorityKind)> = Vec::new();
@@ -105,6 +122,28 @@ fn resolve_communication_target(
     state: &PersistentState,
     main_target: Option<&DeviceId>,
 ) -> Option<DeviceId> {
+    if device_type == DeviceType::Output
+        && let Some(main_id) = main_target
+        && let Some(settings) = state.device_settings(main_id)
+    {
+        match &settings.communication_route {
+            CommunicationRoute::SameDevice => return Some(main_id.clone()),
+            CommunicationRoute::Paired(paired_id) => {
+                // A missing voice endpoint falls back to the chosen main output,
+                // rather than leaving chat on an unrelated previous device.
+                let paired_is_available = backend
+                    .devices(DeviceType::Output)
+                    .is_ok_and(|devices| devices.iter().any(|d| d.id() == paired_id))
+                    && device_is_available(backend, paired_id, state);
+                return Some(if paired_is_available {
+                    paired_id.clone()
+                } else {
+                    main_id.clone()
+                });
+            }
+            CommunicationRoute::Inherited => {}
+        }
+    }
     let comm_list = state.communication_priority_list(device_type);
     if comm_list.is_empty() {
         return if state.switch_communication_device(device_type) {
@@ -113,7 +152,7 @@ fn resolve_communication_target(
             None
         };
     }
-    find_highest_priority_active_device(backend, comm_list)
+    find_highest_priority_active_device(backend, comm_list, state)
 }
 
 fn notify_priority_restored(
@@ -154,23 +193,37 @@ fn notify_priority_restored(
 fn find_highest_priority_active_device(
     backend: &impl AudioBackend,
     priority_list: &[DeviceId],
+    state: &PersistentState,
 ) -> Option<DeviceId> {
     priority_list
         .iter()
-        .find_map(|device_id| match backend.device_by_id(device_id) {
-            Ok(device) => match device.is_active() {
-                Ok(true) => Some(device_id.clone()),
-                Ok(false) => None,
-                Err(e) => {
-                    log::warn!("Failed to check if device {device_id} is active: {e:#}");
-                    None
-                }
-            },
+        .find(|device_id| device_is_available(backend, device_id, state))
+        .cloned()
+}
+
+fn device_is_available(
+    backend: &impl AudioBackend,
+    device_id: &DeviceId,
+    state: &PersistentState,
+) -> bool {
+    if let Some(settings) = state.device_settings(device_id)
+        && backend.headset_presence(settings.presence_source) == HeadsetPresence::Unavailable
+    {
+        return false;
+    }
+    match backend.device_by_id(device_id) {
+        Ok(device) => match device.is_active() {
+            Ok(active) => active,
             Err(e) => {
-                log::warn!("Failed to get device {device_id} for priority check: {e:#}");
-                None
+                log::warn!("Failed to check if device {device_id} is active: {e:#}");
+                false
             }
-        })
+        },
+        Err(e) => {
+            log::warn!("Failed to get device {device_id} for priority check: {e:#}");
+            false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -525,7 +578,7 @@ mod tests {
         ]);
         let list = vec!["dev_a".into(), "dev_b".into(), "dev_c".into()];
         assert_eq!(
-            find_highest_priority_active_device(&backend, &list),
+            find_highest_priority_active_device(&backend, &list, &PersistentState::default()),
             Some(DeviceId::from("dev_b"))
         );
     }
@@ -537,13 +590,19 @@ mod tests {
             MockDevice::new("dev_b", "B", false),
         ]);
         let list = vec!["dev_a".into(), "dev_b".into()];
-        assert_eq!(find_highest_priority_active_device(&backend, &list), None);
+        assert_eq!(
+            find_highest_priority_active_device(&backend, &list, &PersistentState::default()),
+            None
+        );
     }
 
     #[test]
     fn find_highest_returns_none_for_empty_list() {
         let backend = MockAudioBackend::new(vec![]);
         let list: Vec<DeviceId> = vec![];
-        assert_eq!(find_highest_priority_active_device(&backend, &list), None);
+        assert_eq!(
+            find_highest_priority_active_device(&backend, &list, &PersistentState::default()),
+            None
+        );
     }
 }
