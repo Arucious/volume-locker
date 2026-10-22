@@ -12,6 +12,14 @@ Volume Locker is a tray icon app that keeps the volume of your audio devices loc
 
 Never worry about your microphone volume or default device again!
 
+## Fork changes
+
+This fork of [felipecrs/volume-locker](https://github.com/felipecrs/volume-locker) adds independent communication-device priority lists for both output and input. Keep game or media audio on your speakers while voice chat uses your headset, with separate automatic fallback orders for each role.
+
+Configure the lists in the **Communication device priority** submenu under the output or input priority section. Empty communication lists preserve upstream behavior, and temporary default-device overrides leave configured communication priorities in place. See [Communication Device Priority](#communication-device-priority) for details.
+
+To use this fork's changes, build with `cargo build --release --locked` and run `target/release/VolumeLocker.exe`. The release downloads, installation commands, and in-app updater still point to the upstream project.
+
 ## Demo
 
 https://github.com/user-attachments/assets/b7e47898-ee9f-42b4-a804-f107beac4e98
