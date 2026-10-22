@@ -1,6 +1,6 @@
 # Paired outputs and headset power: branch exploration
 
-Branch: `codex/paired-outputs-headset-presence`, based on the fork's v0.9.0 source.
+Branch: `feat/paired-outputs-headset-presence`, based on the fork's v0.9.0 source.
 
 ## Prototype behavior
 
