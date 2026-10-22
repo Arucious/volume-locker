@@ -18,7 +18,7 @@ This fork of [felipecrs/volume-locker](https://github.com/felipecrs/volume-locke
 
 Configure the lists in the **Communication device priority** submenu under the output or input priority section. Empty communication lists preserve upstream behavior, and temporary default-device overrides leave configured communication priorities in place. See [Communication Device Priority](#communication-device-priority) for details.
 
-To use this fork's changes, build with `cargo build --release --locked` and run `target/release/VolumeLocker.exe`. The release downloads, installation commands, and in-app updater still point to the upstream project.
+Download this fork's Windows executable from the [releases page](https://github.com/Arucious/volume-locker/releases/latest), or build with `cargo build --release --locked` and run `target/release/VolumeLocker.exe`. The installation commands and in-app updater use this fork's releases.
 
 ## Demo
 
@@ -26,7 +26,7 @@ https://github.com/user-attachments/assets/b7e47898-ee9f-42b4-a804-f107beac4e98
 
 ## Getting Started
 
-Simply grab the executable from the [releases page](https://github.com/felipecrs/volume-locker/releases), place it somewhere like `C:\Apps\Volume Locker\VolumeLocker.exe` and run it.
+Simply grab the executable from the [releases page](https://github.com/Arucious/volume-locker/releases/latest), place it somewhere like `C:\Apps\Volume Locker\VolumeLocker.exe` and run it.
 
 Or you can copy and paste this into _Windows PowerShell_, and execute:
 
@@ -34,7 +34,7 @@ Or you can copy and paste this into _Windows PowerShell_, and execute:
 New-Item -ItemType Directory -Path 'C:\Apps\Volume Locker' -Force >$null; `
   Get-Process | Where-Object { $_.Path -eq 'C:\Apps\Volume Locker\VolumeLocker.exe' } | Stop-Process; `
   curl.exe --progress-bar --location --output 'C:\Apps\Volume Locker\VolumeLocker.exe' `
-  'https://github.com/felipecrs/volume-locker/releases/latest/download/VolumeLocker.exe'; `
+  'https://github.com/Arucious/volume-locker/releases/latest/download/VolumeLocker.exe'; `
   Start-Process 'C:\Apps\Volume Locker\VolumeLocker.exe'
 ```
 
