@@ -4,7 +4,7 @@ mod menu_builder;
 pub use event_handler::{MenuEventContext, MenuEventResult, handle_menu_event};
 pub use menu_builder::{MenuContext, TrayMenuItems, rebuild_tray_menu};
 
-use crate::types::{CommunicationRoute, DeviceId, DeviceType, PriorityKind};
+use crate::types::{CommunicationRoute, DeviceId, DeviceType, PresenceSource, PriorityKind};
 use std::collections::HashMap;
 use tray_icon::menu::{Menu, MenuId, MenuItemKind};
 
@@ -25,6 +25,7 @@ pub enum DeviceAction {
     MovePriorityToBottom(PriorityKind),
     SetTemporaryPriority,
     SetCommunicationRoute(CommunicationRoute),
+    SetPresenceSource(PresenceSource),
     OpenProperties,
     OpenSettings,
 }

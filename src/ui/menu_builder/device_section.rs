@@ -103,6 +103,14 @@ pub fn build_device_submenu(
         output_choices,
     )?;
 
+    super::presence_section::append_presence_settings(
+        &submenu,
+        device_id,
+        &name,
+        device_type,
+        persistent_state,
+        map,
+    )?;
     Ok(submenu)
 }
 
@@ -187,8 +195,8 @@ mod tests {
         )
         .expect("build_device_submenu should succeed");
 
-        // Existing controls plus voice routing.
-        assert_eq!(map.len(), 8);
+        // Existing controls plus voice routing and availability.
+        assert_eq!(map.len(), 10);
         assert!(submenu.text().contains("Speakers"));
     }
 

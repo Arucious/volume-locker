@@ -294,6 +294,13 @@ fn handle_device_event(
             ctx.persistent_state.remove_device_if_unused(device_id);
             MenuEventResult::SaveConfig
         }
+        DeviceAction::SetPresenceSource(source) => {
+            ctx.persistent_state
+                .ensure_device_settings(device_id.clone(), device_name.to_string(), device_type)
+                .presence_source = *source;
+            ctx.persistent_state.remove_device_if_unused(device_id);
+            MenuEventResult::SaveConfig
+        }
         DeviceAction::OpenProperties => {
             if let Err(e) = open_sound_control_panel(sound_panel_tab(device_type)) {
                 log::error!("Failed to open sound control panel: {e:#}");

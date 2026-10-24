@@ -201,6 +201,22 @@ pub struct DeviceSettings {
     pub name: String,
     #[serde(default, skip_serializing_if = "CommunicationRoute::is_inherited")]
     pub communication_route: CommunicationRoute,
+    #[serde(default, skip_serializing_if = "PresenceSource::is_windows")]
+    pub presence_source: PresenceSource,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PresenceSource {
+    #[default]
+    Windows,
+    AstroA50X,
+}
+
+impl PresenceSource {
+    pub fn is_windows(&self) -> bool {
+        matches!(self, Self::Windows)
+    }
 }
 
 /// An output's optional voice destination. Input routing keeps the global policy.
@@ -226,7 +242,8 @@ impl DeviceSettings {
             unmute_lock: UnmuteLockPolicy::default(),
             device_type,
             name,
-            communication_route: Default::default(),
+            communication_route: CommunicationRoute::default(),
+            presence_source: PresenceSource::default(),
         }
     }
 
@@ -285,7 +302,7 @@ pub enum UserEvent {
 #[cfg(test)]
 #[allow(clippy::float_cmp)]
 mod tests {
-    use super::{CommunicationRoute, DeviceSettings, DeviceType, VolumePercent, VolumeScalar};
+    use super::{DeviceSettings, DeviceType, VolumePercent, VolumeScalar};
 
     #[test]
     fn device_type_serialization_roundtrip() {
@@ -312,6 +329,8 @@ mod tests {
         assert!(!settings.unmute_lock.notify);
         assert_eq!(settings.device_type, DeviceType::Output);
         assert_eq!(settings.name, "Test");
+        assert!(settings.communication_route.is_inherited());
+        assert!(settings.presence_source.is_windows());
     }
 
     #[test]
@@ -329,7 +348,8 @@ mod tests {
             },
             device_type: DeviceType::Input,
             name: "Microphone".into(),
-            communication_route: CommunicationRoute::default(),
+            communication_route: Default::default(),
+            presence_source: Default::default(),
         };
         let json = serde_json::to_string(&settings).unwrap();
         let loaded: DeviceSettings = serde_json::from_str(&json).unwrap();

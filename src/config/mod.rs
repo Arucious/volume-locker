@@ -205,7 +205,9 @@ impl PersistentState {
     /// and is not referenced by any priority list.
     pub fn remove_device_if_unused(&mut self, device_id: &DeviceId) {
         let is_prunable = self.devices.get(device_id).is_some_and(|s| {
-            !s.has_active_locks_or_notifications() && s.communication_route.is_inherited()
+            !s.has_active_locks_or_notifications()
+                && s.communication_route.is_inherited()
+                && s.presence_source.is_windows()
         });
         if !is_prunable {
             return;
@@ -319,6 +321,7 @@ mod tests {
                     device_type: DeviceType::Output,
                     name: "Test Device".into(),
                     communication_route: Default::default(),
+                    presence_source: Default::default(),
                 },
             )]),
             ..Default::default()
@@ -511,6 +514,7 @@ mod tests {
                     device_type: DeviceType::Output,
                     name: "Speakers".into(),
                     communication_route: Default::default(),
+                    presence_source: Default::default(),
                 },
             )]),
         };

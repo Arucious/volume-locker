@@ -1,8 +1,8 @@
 use super::tests::{MockAudioBackend, MockDevice};
-use super::{enforce_priorities, migrate_device_ids};
+use super::{enforce_priorities, migrate_device_ids, presence::HeadsetPresence};
 use crate::config::PersistentState;
 use crate::notification::NotificationThrottler;
-use crate::types::{CommunicationRoute, DeviceType, TemporaryPriorities};
+use crate::types::{CommunicationRoute, DeviceType, PresenceSource, TemporaryPriorities};
 
 fn setup(voice_active: bool) -> (MockAudioBackend, PersistentState) {
     let backend = MockAudioBackend::new(vec![
@@ -92,6 +92,50 @@ fn paired_output_cannot_accidentally_route_to_an_input_endpoint() {
 }
 
 #[test]
+fn radio_power_off_falls_back_while_usb_endpoint_remains_active() {
+    let (backend, mut state) = setup(true);
+    state.devices.get_mut("game").unwrap().presence_source = PresenceSource::AstroA50X;
+    check(&backend, &state, None, "game", "voice");
+    *backend.presence.borrow_mut() = HeadsetPresence::Unavailable;
+    check(&backend, &state, None, "speakers", "speakers");
+    check(&backend, &state, Some("game"), "speakers", "speakers");
+    *backend.presence.borrow_mut() = HeadsetPresence::Available;
+    check(&backend, &state, None, "game", "voice");
+    *backend.presence.borrow_mut() = HeadsetPresence::Unknown;
+    check(&backend, &state, None, "game", "voice");
+}
+
+#[test]
+fn radio_observation_does_not_affect_devices_without_opt_in() {
+    let (backend, state) = setup(true);
+    *backend.presence.borrow_mut() = HeadsetPresence::Unavailable;
+    check(&backend, &state, None, "game", "voice");
+}
+
+#[test]
+fn available_radio_does_not_revive_a_disabled_windows_endpoint() {
+    let (mut backend, mut state) = setup(true);
+    backend.devices[0].active = false;
+    state.devices.get_mut("game").unwrap().presence_source = PresenceSource::AstroA50X;
+    *backend.presence.borrow_mut() = HeadsetPresence::Available;
+    check(&backend, &state, None, "speakers", "speakers");
+}
+
+#[test]
+fn legacy_independent_communication_list_uses_presence_observations_too() {
+    let (backend, mut state) = setup(true);
+    state
+        .devices
+        .get_mut("speakers")
+        .unwrap()
+        .communication_route = CommunicationRoute::Inherited;
+    state.devices.get_mut("voice").unwrap().presence_source = PresenceSource::AstroA50X;
+    state.output.communication_priority_list = vec!["voice".into(), "speakers".into()];
+    *backend.presence.borrow_mut() = HeadsetPresence::Unavailable;
+    check(&backend, &state, Some("speakers"), "speakers", "speakers");
+}
+
+#[test]
 fn simultaneous_migration_of_both_pair_endpoints_retains_the_link() {
     let (_, mut state) = setup(true);
     let backend = MockAudioBackend::new(vec![
@@ -99,11 +143,16 @@ fn simultaneous_migration_of_both_pair_endpoints_retains_the_link() {
         MockDevice::new("new_voice", "A50 X Voice", true),
         MockDevice::new("speakers", "Speakers", true),
     ]);
+    state.devices.get_mut("game").unwrap().presence_source = PresenceSource::AstroA50X;
     assert!(migrate_device_ids(&backend, &mut state));
     assert_eq!(state.output.priority_list[0], "new_game");
     assert_eq!(
         state.devices["new_game"].communication_route,
         CommunicationRoute::Paired("new_voice".into())
+    );
+    assert_eq!(
+        state.devices["new_game"].presence_source,
+        PresenceSource::AstroA50X
     );
     check(&backend, &state, None, "new_game", "new_voice");
 }

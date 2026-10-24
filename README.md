@@ -61,7 +61,7 @@ Volume Locker can automatically switch your default audio device based on a prio
 3.  Use **Move Up** and **Move Down** to adjust the priority order. The device at the top has the highest priority.
 4.  Volume Locker will monitor your devices and automatically switch the default device to the highest priority one available.
 5.  Check **Notify on restore** to get a notification when the default device is switched.
-6.  Check **Also switch default communication device** to also switch the default communication device.
+6.  Open **Communication settings** and check **Also switch default communication device** to also switch the default communication device.
 
 ### Communication Device Priority
 
@@ -97,6 +97,16 @@ policy. Apps must use Windows' default communication device to follow the route.
 Explicit per-output routes take precedence over independent communication priorities
 and the global checkbox. Choose **Use global voice settings** to use those policies.
 
+### Experimental Wireless Headset Availability
+
+Wireless receivers can remain connected while their headset is off. An opt-in
+passive HID detector can skip an unavailable A50 X in the existing input/output
+priority lists. Enable it under a device's **Availability** submenu and configure
+a fallback device. Startup state is unknown until a power event is observed.
+See [experimental headset availability](docs/experimental-headset-presence.md) for
+firmware limitations, read-only diagnostics and the protocol adapter interface
+for adding other devices. Only A50 X power events are currently supported.
+
 ### Temporary Default Device Priority
 
 If you want to temporarily use a different device without changing your priority list (e.g., switching to speakers for a call while the headphones are connected), you can use the **Temporary default device priority** feature.
@@ -105,6 +115,11 @@ If you want to temporarily use a different device without changing your priority
 2.  Select **Output device** or **Input device**.
 3.  Choose the device you want to use temporarily.
 4.  This device will be treated as the highest priority device until you uncheck it or restart the application.
+
+## Upstream Feature Review
+
+The three feature PRs and their tested integration are described in
+[the review and merge guide](docs/upstream-feature-review.md).
 
 ## Credits
 
