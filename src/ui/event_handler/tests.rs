@@ -261,6 +261,76 @@ fn make_backend_with_device(id: &str, name: &str) -> MockAudioBackend {
 }
 
 #[test]
+fn pairing_menu_actions_keep_target_metadata_and_clear_unused_settings() {
+    use super::{MenuEventContext, MenuEventResult, handle_device_event};
+    use crate::types::{CommunicationRoute, PresenceSource, TemporaryPriorities};
+    use tray_icon::menu::{Menu, MenuEvent, MenuItem};
+    let backend = MockAudioBackend::new(vec![
+        MockDevice::new("game", "Game", true),
+        MockDevice::new("voice", "Voice", true),
+    ]);
+    let mut state = PersistentState::default();
+    let mut temporary = TemporaryPriorities::default();
+    let menu = Menu::new();
+    let item = MenuItem::new("Pair", true, None);
+    let event = MenuEvent {
+        id: item.id().clone(),
+    };
+    let update = None;
+    let mut ctx = MenuEventContext {
+        tray_menu: &menu,
+        persistent_state: &mut state,
+        backend: &backend,
+        temporary_priorities: &mut temporary,
+        update_info: &update,
+    };
+    let pair = DeviceAction::SetCommunicationRoute(CommunicationRoute::Paired("voice".into()));
+    assert!(matches!(
+        handle_device_event(
+            &event,
+            &pair,
+            &"game".into(),
+            DeviceType::Output,
+            "Game",
+            &mut ctx
+        ),
+        MenuEventResult::SaveConfig
+    ));
+    assert_eq!(ctx.persistent_state.devices["voice"].name, "Voice");
+    assert_eq!(
+        ctx.persistent_state.devices["game"].communication_route,
+        CommunicationRoute::Paired("voice".into())
+    );
+    assert!(matches!(
+        handle_device_event(
+            &event,
+            &DeviceAction::SetPresenceSource(PresenceSource::AstroA50X),
+            &"game".into(),
+            DeviceType::Output,
+            "Game",
+            &mut ctx
+        ),
+        MenuEventResult::SaveConfig
+    ));
+    assert!(matches!(
+        handle_device_event(
+            &event,
+            &DeviceAction::SetCommunicationRoute(CommunicationRoute::Inherited),
+            &"game".into(),
+            DeviceType::Output,
+            "Game",
+            &mut ctx
+        ),
+        MenuEventResult::SaveConfig
+    ));
+    assert!(!ctx.persistent_state.devices.contains_key("voice"));
+    assert_eq!(
+        ctx.persistent_state.devices["game"].presence_source,
+        PresenceSource::AstroA50X
+    );
+}
+
+#[test]
 fn volume_lock_enable_captures_current_volume() {
     let backend = make_backend_with_device("dev1", "Speaker");
     let mut state = PersistentState::default();

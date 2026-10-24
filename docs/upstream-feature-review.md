@@ -62,17 +62,22 @@ for all targets with warnings denied, and a frozen release build.
 
 | Checked version | Unit tests | Windows bindings | Example tests | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Communication priorities alone | 128 | 1 | 0 | 129 |
+| Communication priorities alone | 129 | 1 | 0 | 130 |
 | Output routes alone | 118 | 1 | 0 | 119 |
 | HID availability alone | 120 | 1 | 8 | 129 |
 | Communication priorities + output routes | 138 | 1 | 0 | 139 |
-| All three integrated | 153 | 1 | 8 | 162 |
+| All three integrated | 157 | 1 | 8 | 166 |
 
 The diagnostic Python source and both PowerShell scripts parse successfully.
 A two-second read-only observer run opened the matching A50 X HID interface and
 shut down cleanly. It remained Unknown because no power transition was observed.
 Automated tests use mocked audio backends and captured report fixtures; no live
 Windows default devices were changed during validation.
+
+A direct comparison with the original fork matched all 27 native-menu/action
+scenarios and all 864 routing combinations. The standalone communication menu
+was aligned with the current fork layout and the original cross-feature tests
+were retained. See [the functional parity report](fork-functional-parity.md).
 
 The HID draft still needs physical on/off routing and a soak test, startup-state
 research, and captures for docking, sleep, out-of-range and G HUB-exited behavior.
