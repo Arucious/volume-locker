@@ -65,47 +65,23 @@ Volume Locker can automatically switch your default audio device based on a prio
 
 ### Communication Device Priority
 
-Output and input each support an independent communication-device priority list.
-For example, keep game audio on speakers while voice chat uses a headset, or use
-a different microphone for calls. Open **Default output device priority** or
-**Default input device priority**, then **Communication settings > Communication device priority**, then add and
-order devices as in the main list.
+Output and input each support an independent communication-device priority list. For example, keep game audio on speakers while voice chat uses a headset, or use a different microphone for calls. Open **Default output device priority** or **Default input device priority**, then **Communication settings > Communication device priority**, then add and order devices as in the main list.
 
-A non-empty communication list controls only the Windows Communications role,
-including its own fallback order. It takes precedence over **Also switch default
-communication device**, which is disabled while the list is configured. An empty
-list preserves that checkbox's existing behavior. If every communication device
-is unavailable, the current communication default is left alone.
+A non-empty communication list controls only the Windows Communications role, including its own fallback order. It takes precedence over **Also switch default communication device**, which is disabled while the list is configured. An empty list preserves that checkbox's existing behavior. If every communication device is unavailable, the current communication default is left alone.
 
-**Temporary default device priority** overrides only the main list; an independent
-communication list keeps its own selection for outputs using global voice settings. Apps must use the corresponding
-Windows default device to follow these changes.
+**Temporary default device priority** overrides only the main list; an independent communication list keeps its own selection for outputs using global voice settings. Apps must use the corresponding Windows default device to follow these changes.
 
 ### Paired Voice Outputs
 
-Open **Output devices > device > Voice output** to choose a communication
-destination for that output. Choose **Same as this output** for speakers, or pair
-a split-channel headset's Game output with its Voice output. **Use global voice
-settings** preserves the existing communication checkbox behavior.
+Open **Output devices > device > Voice output** to choose a communication destination for that output. Choose **Same as this output** for speakers, or pair a split-channel headset's Game output with its Voice output. **Use global voice settings** preserves the existing communication checkbox behavior.
 
-Explicit routes follow the main priority list and temporary output selection.
-With no main output priority list they also follow manual Windows output changes.
-A missing or inactive pair falls back to the selected main output; reconnecting
-the paired endpoint restores the saved route. Input devices keep their global
-policy. Apps must use Windows' default communication device to follow the route.
+Explicit routes follow the main priority list and temporary output selection. With no main output priority list they also follow manual Windows output changes. A missing or inactive pair falls back to the selected main output; reconnecting the paired endpoint restores the saved route. Input devices keep their global policy. Apps must use Windows' default communication device to follow the route.
 
-Explicit per-output routes take precedence over independent communication priorities
-and the global checkbox. Choose **Use global voice settings** to use those policies.
+Explicit per-output routes take precedence over independent communication priorities and the global checkbox. Choose **Use global voice settings** to use those policies.
 
 ### Experimental Wireless Headset Availability
 
-Wireless receivers can remain connected while their headset is off. An opt-in
-passive HID detector can skip an unavailable A50 X in the existing input/output
-priority lists. Enable it under a device's **Availability** submenu and configure
-a fallback device. Startup state is unknown until a power event is observed.
-See [experimental headset availability](docs/experimental-headset-presence.md) for
-firmware limitations, read-only diagnostics and the protocol adapter interface
-for adding other devices. Only A50 X power events are currently supported.
+Wireless receivers can remain connected while their headset is off. An opt-in passive HID detector can skip an unavailable A50 X in the existing input/output priority lists. Enable it under a device's **Availability** submenu and configure a fallback device. Startup state is unknown until a power event is observed. See [experimental headset availability](docs/experimental-headset-presence.md) for firmware limitations, read-only diagnostics and the protocol adapter interface for adding other devices. Only A50 X power events are currently supported.
 
 ### Temporary Default Device Priority
 
@@ -118,8 +94,7 @@ If you want to temporarily use a different device without changing your priority
 
 ## Upstream Feature Review
 
-The three feature PRs and their tested integration are described in
-[the review and merge guide](docs/upstream-feature-review.md).
+The three feature PRs and their tested integration are described in [the review and merge guide](docs/upstream-feature-review.md).
 
 ## Credits
 

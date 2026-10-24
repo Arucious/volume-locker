@@ -5,9 +5,9 @@ against `felipecrs/volume-locker:master`, based on upstream commit `34784db`.
 
 | Order | Pull request | Branch | Scope | State |
 | --- | --- | --- | --- | --- |
-| 1 | [#173](https://github.com/felipecrs/volume-locker/pull/173) | `codex/upstream-communication-priority` | Independent communication priorities for input and output | Ready for review |
-| 2 | [#174](https://github.com/felipecrs/volume-locker/pull/174) | `codex/upstream-output-voice-routing` | Voice destinations attached to individual outputs | Ready for review |
-| 3 | [#175](https://github.com/felipecrs/volume-locker/pull/175) | `codex/upstream-experimental-hid` | Opt-in A50 X availability and reusable passive HID profiles | Draft |
+| 1 | [#176](https://github.com/felipecrs/volume-locker/pull/176) | `feat/communication-priorities` | Independent communication priorities for input and output | Draft |
+| 2 | [#177](https://github.com/felipecrs/volume-locker/pull/177) | `feat/output-voice-routing` | Voice destinations attached to individual outputs | Draft |
+| 3 | [#178](https://github.com/felipecrs/volume-locker/pull/178) | `feat/experimental-hid-presence` | Opt-in A50 X availability and reusable passive HID profiles | Draft |
 
 These are separate upstream PRs with a suggested merge order, not a native GitHub
 stack. Download links, package repository metadata and the in-app updater continue
@@ -33,7 +33,7 @@ and releases are preserved.
 The PRs intentionally build without each other, but their resolver, configuration
 and menu changes overlap. Later PRs may need conflict resolution after earlier PRs
 merge. The branch
-[`codex/upstream-feature-integration`](https://github.com/Arucious/volume-locker/tree/codex/upstream-feature-integration)
+[`feat/upstream-feature-integration`](https://github.com/Arucious/volume-locker/tree/feat/upstream-feature-integration)
 already resolves those overlaps in a linear sequence of three feature commits.
 It also tests cross-feature precedence, unavailable paired endpoints, independent
 communication fallback and simultaneous pair migration.
@@ -41,7 +41,7 @@ communication fallback and simultaneous pair migration.
 To inspect or build the combined result in a clean checkout:
 
 ```sh
-git fetch https://github.com/Arucious/volume-locker.git codex/upstream-feature-integration
+git fetch https://github.com/Arucious/volume-locker.git feat/upstream-feature-integration
 git switch --detach FETCH_HEAD
 cargo test --all-targets --locked
 cargo clippy --all-targets --locked -- -D warnings
@@ -49,8 +49,9 @@ cargo build --release --frozen
 ```
 
 The prepared integration commits are `dd66a8e` (communication priorities),
-`407482d` (output routes on top of that feature), and the fetched integration tip
-(HID availability on top of both). They are useful starting points when updating
+`407482d` (output routes on top of that feature), and `905fcad`
+(HID availability on top of both). Follow-up commits add validation and documentation.
+These feature commits are useful starting points when updating
 the remaining PRs after upstream merges. Apply only layers that have not already
 landed. If upstream changes further, rebase and rerun checks.
 
