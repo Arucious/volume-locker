@@ -126,7 +126,7 @@ fn append_priority_entries(
 /// submenu rather than inlined so the tray menu does not double in length for
 /// the majority of users who never configure a separate list.
 fn append_communication_priority_submenu(
-    tray_menu: &Menu,
+    container: &impl MenuContainer,
     device_type: DeviceType,
     backend: &impl AudioBackend,
     persistent_state: &PersistentState,
@@ -153,7 +153,7 @@ fn append_communication_priority_submenu(
         persistent_state,
         map,
     )?;
-    tray_menu.append(&submenu)?;
+    container.add(&submenu)?;
 
     Ok(())
 }
@@ -232,9 +232,18 @@ pub fn append_priority_list_to_menu(
             },
         },
     );
-    tray_menu.append(&switch_comm_item)?;
+    // Keep legacy independent lists available without expanding the root menu.
+    let communication_settings = Submenu::new("Communication settings", true);
+    communication_settings.append(&switch_comm_item)?;
 
-    append_communication_priority_submenu(tray_menu, device_type, backend, persistent_state, map)?;
+    append_communication_priority_submenu(
+        &communication_settings,
+        device_type,
+        backend,
+        persistent_state,
+        map,
+    )?;
+    tray_menu.append(&communication_settings)?;
 
     tray_menu.append(&PredefinedMenuItem::separator())?;
 

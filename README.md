@@ -68,7 +68,7 @@ Volume Locker can automatically switch your default audio device based on a prio
 Output and input each support an independent communication-device priority list.
 For example, keep game audio on speakers while voice chat uses a headset, or use
 a different microphone for calls. Open **Default output device priority** or
-**Default input device priority > Communication device priority**, then add and
+**Default input device priority**, then **Communication settings > Communication device priority**, then add and
 order devices as in the main list.
 
 A non-empty communication list controls only the Windows Communications role,
@@ -78,8 +78,24 @@ list preserves that checkbox's existing behavior. If every communication device
 is unavailable, the current communication default is left alone.
 
 **Temporary default device priority** overrides only the main list; an independent
-communication list keeps its own selection. Apps must use the corresponding
+communication list keeps its own selection for outputs using global voice settings. Apps must use the corresponding
 Windows default device to follow these changes.
+
+### Paired Voice Outputs
+
+Open **Output devices > device > Voice output** to choose a communication
+destination for that output. Choose **Same as this output** for speakers, or pair
+a split-channel headset's Game output with its Voice output. **Use global voice
+settings** preserves the existing communication checkbox behavior.
+
+Explicit routes follow the main priority list and temporary output selection.
+With no main output priority list they also follow manual Windows output changes.
+A missing or inactive pair falls back to the selected main output; reconnecting
+the paired endpoint restores the saved route. Input devices keep their global
+policy. Apps must use Windows' default communication device to follow the route.
+
+Explicit per-output routes take precedence over independent communication priorities
+and the global checkbox. Choose **Use global voice settings** to use those policies.
 
 ### Temporary Default Device Priority
 
